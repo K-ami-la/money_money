@@ -1,5 +1,4 @@
-# MiniCount – partage des frais entre amis
-
+# Money_money – partage des frais entre amis
 Un petit clone de Tricount en un seul fichier HTML, sans serveur, hébergeable gratuitement sur GitHub Pages.
 
 ## Fonctionnalités
