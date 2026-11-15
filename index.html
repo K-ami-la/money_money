@@ -3,15 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MiniCount – Partage des frais</title>
+<title>Money_money – Partage des frais</title>
 <style>
   :root { --bg:#f5f3ee; --card:#fff; --ink:#1f2328; --muted:#6b7280; --accent:#0f766e; --accent2:#e6f2f0; --red:#b42318; --green:#067647; --line:#e5e2da; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--accent); color:#fff; padding:18px 16px; }
-  header h1 { margin:0; font-size:1.3rem; }
-  header input { background:transparent; border:none; color:#fff; font-size:1.3rem; font-weight:700; width:100%; outline:none; }
-  header small { opacity:.8; }
+  header { background:var(--accent); color:#fff; padding:14px 16px; }
+  .hwrap { max-width:720px; margin:0 auto; }
+  .brand { font-size:.85rem; opacity:.85; margin-bottom:8px; }
+  .grouprow { display:flex; gap:8px; align-items:center; }
+  .grouprow select { flex:1; font-size:1.05rem; font-weight:700; background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.35); }
+  .grouprow select option { color:var(--ink); }
+  .grouprow button { background:#fff; color:var(--accent); white-space:nowrap; }
   main { max-width:720px; margin:0 auto; padding:16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
   h2 { font-size:1rem; margin:0 0 12px; }
@@ -20,6 +23,8 @@
   input:focus, select:focus { outline:2px solid var(--accent); border-color:transparent; }
   button { font:inherit; padding:9px 14px; border:none; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
   button.ghost { background:var(--accent2); color:var(--accent); }
+  button.small { padding:5px 10px; font-size:.85rem; }
+  button.icon { background:none; color:var(--muted); padding:4px 6px; }
   button.danger { background:none; color:var(--red); padding:4px 8px; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
   .chip { background:var(--accent2); color:var(--accent); border-radius:999px; padding:4px 6px 4px 12px; display:flex; align-items:center; gap:4px; }
@@ -29,6 +34,7 @@
   ul.list { list-style:none; padding:0; margin:0; }
   ul.list li { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:8px; }
   ul.list li:last-child { border-bottom:none; }
+  li.remb { color:var(--muted); }
   .muted { color:var(--muted); font-size:.85rem; }
   .pos { color:var(--green); font-weight:600; }
   .neg { color:var(--red); font-weight:600; }
@@ -36,15 +42,21 @@
   .tabs { display:flex; gap:6px; margin-bottom:16px; }
   .tabs button { flex:1; background:var(--card); color:var(--ink); border:1px solid var(--line); }
   .tabs button.active { background:var(--accent); color:#fff; }
-  .hidden { display:none; }
-  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:8px; opacity:0; transition:.3s; pointer-events:none; }
+  .hidden { display:none !important; }
+  .editing { outline:2px solid #f59e0b; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:8px; opacity:0; transition:.3s; pointer-events:none; z-index:10; }
   .toast.show { opacity:1; }
 </style>
 </head>
 <body>
 <header>
-  <input id="groupName" placeholder="Nom du groupe (ex : Week-end à Lyon)">
-  <small>Partage des frais entre amis</small>
+  <div class="hwrap">
+    <div class="brand">💰 Money_money – partage des frais entre amis</div>
+    <div class="grouprow">
+      <select id="groupSelect" title="Changer de groupe"></select>
+      <button id="newGroup" class="small">+ Nouveau groupe</button>
+    </div>
+  </div>
 </header>
 
 <main>
@@ -56,8 +68,8 @@
 
   <!-- DÉPENSES -->
   <section id="tab-depenses">
-    <div class="card">
-      <h2>Ajouter une dépense</h2>
+    <div class="card" id="expCard">
+      <h2 id="expFormTitle">Ajouter une dépense</h2>
       <div class="row">
         <input id="expTitle" placeholder="Quoi ? (ex : Courses)" style="flex:2;min-width:160px">
         <input id="expAmount" type="number" step="0.01" min="0" placeholder="Montant €" style="flex:1;min-width:110px">
@@ -68,11 +80,14 @@
       </div>
       <div class="muted" style="margin-top:10px">Pour qui (partage égal) :</div>
       <div class="checks" id="expFor"></div>
-      <button id="addExp">Ajouter</button>
+      <div class="row">
+        <button id="addExp">Ajouter</button>
+        <button id="cancelEdit" class="ghost hidden">Annuler</button>
+      </div>
     </div>
     <div class="card">
       <h2>Historique</h2>
-      <div class="muted">Total : <span class="total" id="total">0 €</span></div>
+      <div class="muted">Total des dépenses : <span class="total" id="total">0 €</span></div>
       <ul class="list" id="expList"></ul>
     </div>
   </section>
@@ -85,12 +100,28 @@
     </div>
     <div class="card">
       <h2>Qui doit rembourser qui</h2>
+      <p class="muted" style="margin-top:-6px">Quand quelqu'un a fait le virement, cliquez sur « Remboursé ✓ ».</p>
       <ul class="list" id="settle"></ul>
+    </div>
+    <div class="card">
+      <h2>Enregistrer un autre remboursement</h2>
+      <div class="row">
+        <select id="rFrom" style="flex:1"></select>
+        <span style="align-self:center">a remboursé</span>
+        <input id="rAmount" type="number" step="0.01" min="0" placeholder="€" style="width:100px">
+        <span style="align-self:center">à</span>
+        <select id="rTo" style="flex:1"></select>
+        <button id="addRemb">OK</button>
+      </div>
     </div>
   </section>
 
   <!-- GROUPE -->
   <section id="tab-groupe" class="hidden">
+    <div class="card">
+      <h2>Nom du groupe</h2>
+      <input id="groupName" placeholder="ex : Week-end à Lyon" style="width:100%">
+    </div>
     <div class="card">
       <h2>Participants</h2>
       <div class="row">
@@ -100,8 +131,8 @@
       <div class="chips" id="people"></div>
     </div>
     <div class="card">
-      <h2>Partager avec les amis</h2>
-      <p class="muted">Le lien contient toutes les données du groupe. Envoyez-le à vos amis ; s'ils ajoutent des dépenses, ils vous renvoient leur nouveau lien.</p>
+      <h2>Partager ce groupe avec les amis</h2>
+      <p class="muted">Le lien contient toutes les données de ce groupe. Envoyez-le à vos amis ; s'ils ajoutent des dépenses, ils vous renvoient leur nouveau lien et votre version est mise à jour en l'ouvrant.</p>
       <div class="row">
         <button id="share">Copier le lien de partage</button>
         <button class="ghost" id="export">Exporter (.json)</button>
@@ -111,33 +142,73 @@
     </div>
     <div class="card">
       <h2>Zone dangereuse</h2>
-      <button class="danger" id="reset">Tout effacer et créer un nouveau groupe</button>
+      <button class="danger" id="deleteGroup">Supprimer ce groupe</button>
     </div>
   </section>
 </main>
 <div class="toast" id="toast"></div>
 
 <script>
-const KEY = 'minicount-data';
-let state = { name: '', people: [], expenses: [] };
+const KEY = 'money_money-groups';
+const OLD_KEYS = ['minicount-data', 'money_money-data'];
+let db = { current: null, groups: {} };   // tous les groupes
+let state;                                 // groupe affiché
+let editIndex = null;                      // dépense en cours de modification
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const newGroupObj = name => ({ id: uid(), name: name || 'Nouveau groupe', people: [], expenses: [] });
 
 // ---------- Sauvegarde / chargement ----------
-function encode(obj) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+function encode(obj) { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+function decode(str) { return JSON.parse(decodeURIComponent(escape(atob(str)))); }
+
+function addOrReplaceGroup(g) {
+  if (!g || !Array.isArray(g.people) || !Array.isArray(g.expenses)) throw new Error('invalide');
+  if (!g.id) {
+    // Ancien lien sans identifiant : on réutilise le groupe identique s'il existe déjà
+    const same = Object.values(db.groups).find(x => x.name === g.name &&
+      JSON.stringify(x.people) === JSON.stringify(g.people) && JSON.stringify(x.expenses) === JSON.stringify(g.expenses));
+    g.id = same ? same.id : uid();
+  }
+  if (!g.name) g.name = 'Groupe partagé';
+  db.groups[g.id] = g;
+  db.current = g.id;
 }
-function decode(str) {
-  return JSON.parse(decodeURIComponent(escape(atob(str))));
-}
+
 function load() {
+  try { const s = localStorage.getItem(KEY); if (s) db = JSON.parse(s); } catch (e) {}
+  // Reprise des données de l'ancienne version (un seul groupe)
+  for (const k of OLD_KEYS) {
+    try {
+      const old = localStorage.getItem(k);
+      if (old) {
+        const g = JSON.parse(old);
+        if (g.people && g.people.length) addOrReplaceGroup(g);
+        localStorage.removeItem(k);
+      }
+    } catch (e) {}
+  }
+  // Groupe reçu par un lien
   const hash = location.hash.slice(1);
   if (hash.startsWith('d=')) {
-    try { state = decode(hash.slice(2)); save(); return; } catch (e) { toast('Lien invalide'); }
+    try { addOrReplaceGroup(decode(hash.slice(2))); } catch (e) { toast('Lien invalide'); }
   }
-  try { const s = localStorage.getItem(KEY); if (s) state = JSON.parse(s); } catch (e) {}
+  if (!db.groups[db.current]) {
+    const ids = Object.keys(db.groups);
+    if (ids.length) db.current = ids[0];
+    else { const g = newGroupObj('Mon premier groupe'); db.groups[g.id] = g; db.current = g.id; }
+  }
+  state = db.groups[db.current];
+  save();
 }
+
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
   history.replaceState(null, '', '#d=' + encode(state));
+}
+
+function switchGroup(id) {
+  db.current = id; state = db.groups[id]; cancelEdit(); save(); render();
 }
 
 // ---------- Calculs ----------
@@ -156,7 +227,7 @@ function computeBalances() {
   return bal;
 }
 
-// Algorithme glouton : le plus gros débiteur rembourse le plus gros créancier
+// Le plus gros débiteur rembourse le plus gros créancier, etc.
 function computeSettlements(bal) {
   const debt = [], cred = [];
   for (const [p, v] of Object.entries(bal)) {
@@ -179,26 +250,40 @@ function computeSettlements(bal) {
 // ---------- Affichage ----------
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const options = sel => state.people.map(p => `<option${p === sel ? ' selected' : ''}>${esc(p)}</option>`).join('');
 
 function render() {
+  $('groupSelect').innerHTML = Object.values(db.groups)
+    .map(g => `<option value="${g.id}"${g.id === state.id ? ' selected' : ''}>${esc(g.name)}</option>`).join('');
   $('groupName').value = state.name || '';
 
   $('people').innerHTML = state.people.map((p, i) =>
     `<span class="chip">${esc(p)}<button onclick="removePerson(${i})" title="Retirer">×</button></span>`).join('')
     || '<span class="muted">Ajoutez d\'abord les participants.</span>';
 
-  $('expPayer').innerHTML = state.people.map(p => `<option>${esc(p)}</option>`).join('');
-  $('expFor').innerHTML = state.people.map(p =>
-    `<label><input type="checkbox" value="${esc(p)}" checked> ${esc(p)}</label>`).join('')
-    || '<span class="muted">Aucun participant – allez dans l\'onglet Groupe.</span>';
+  if (editIndex === null) {
+    const prevPayer = $('expPayer').value;
+    $('expPayer').innerHTML = options(prevPayer);
+    $('expFor').innerHTML = state.people.map(p =>
+      `<label><input type="checkbox" value="${esc(p)}" checked> ${esc(p)}</label>`).join('')
+      || '<span class="muted">Aucun participant – allez dans l\'onglet Groupe.</span>';
+  }
+  $('rFrom').innerHTML = options(); $('rTo').innerHTML = options(state.people[1]);
 
-  const total = state.expenses.reduce((s, e) => s + e.amount, 0);
+  const total = state.expenses.filter(e => e.type !== 'remb').reduce((s, e) => s + e.amount, 0);
   $('total').textContent = euro(total);
-  $('expList').innerHTML = state.expenses.slice().reverse().map(e => {
-    const idx = state.expenses.indexOf(e);
+  $('expList').innerHTML = state.expenses.map((e, idx) => ({ e, idx })).reverse().map(({ e, idx }) => {
+    const date = new Date(e.date).toLocaleDateString('fr-FR');
+    if (e.type === 'remb') {
+      return `<li class="remb"><div>💸 <strong>${esc(e.payer)}</strong> a remboursé <strong>${esc(e.for[0])}</strong><br>
+        <span class="muted">Remboursement · ${date}</span></div>
+        <div style="display:flex;align-items:center"><strong>${euro(e.amount)}</strong>
+        <button class="danger" onclick="removeExpense(${idx})" title="Annuler ce remboursement">🗑</button></div></li>`;
+    }
     return `<li><div><strong>${esc(e.title)}</strong><br>
-      <span class="muted">Payé par ${esc(e.payer)} · pour ${e.for.map(esc).join(', ')} · ${new Date(e.date).toLocaleDateString('fr-FR')}</span></div>
+      <span class="muted">Payé par ${esc(e.payer)} · pour ${e.for.map(esc).join(', ')} · ${date}</span></div>
       <div style="display:flex;align-items:center"><strong>${euro(e.amount)}</strong>
+      <button class="icon" onclick="editExpense(${idx})" title="Modifier">✏️</button>
       <button class="danger" onclick="removeExpense(${idx})" title="Supprimer">🗑</button></div></li>`;
   }).join('') || '<li class="muted">Aucune dépense pour l\'instant.</li>';
 
@@ -209,29 +294,53 @@ function render() {
   }).join('') || '<li class="muted">Aucun participant.</li>';
 
   const st = computeSettlements(bal);
-  $('settle').innerHTML = st.map(s =>
-    `<li><span><strong>${esc(s.from)}</strong> doit à <strong>${esc(s.to)}</strong></span><strong>${euro(s.amount)}</strong></li>`).join('')
+  $('settle').innerHTML = st.map((s, i) =>
+    `<li><span><strong>${esc(s.from)}</strong> doit à <strong>${esc(s.to)}</strong></span>
+     <span style="display:flex;gap:8px;align-items:center"><strong>${euro(s.amount)}</strong>
+     <button class="small" onclick="markPaid(${i})">Remboursé ✓</button></span></li>`).join('')
     || '<li class="muted">Tout le monde est quitte 🎉</li>';
+  window._settle = st;
 }
 
 // ---------- Actions ----------
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+function commit(msg) { save(); render(); if (msg) toast(msg); }
 
+// Groupes
+$('groupSelect').onchange = e => switchGroup(e.target.value);
+$('newGroup').onclick = () => {
+  const name = prompt('Nom du nouveau groupe (ex : Vacances en Espagne) :');
+  if (name === null) return;
+  const g = newGroupObj(name.trim());
+  db.groups[g.id] = g; switchGroup(g.id);
+  document.querySelector('[data-tab="groupe"]').click();
+  toast('Groupe créé – ajoutez les participants');
+};
+$('groupName').oninput = e => { state.name = e.target.value; save(); render(); };
+$('deleteGroup').onclick = () => {
+  if (!confirm('Supprimer définitivement le groupe « ' + state.name + ' » ?')) return;
+  delete db.groups[state.id];
+  const ids = Object.keys(db.groups);
+  if (!ids.length) { const g = newGroupObj('Mon premier groupe'); db.groups[g.id] = g; ids.push(g.id); }
+  switchGroup(ids[0]); toast('Groupe supprimé');
+};
+
+// Participants
 $('addPerson').onclick = () => {
   const n = $('personName').value.trim();
   if (!n) return;
   if (state.people.includes(n)) return toast('Ce prénom existe déjà');
-  state.people.push(n); $('personName').value = ''; save(); render();
+  state.people.push(n); $('personName').value = ''; commit();
 };
 $('personName').onkeydown = e => { if (e.key === 'Enter') $('addPerson').click(); };
-
 window.removePerson = i => {
   const p = state.people[i];
   if (state.expenses.some(e => e.payer === p || e.for.includes(p)))
     return toast(p + ' est utilisé dans des dépenses');
-  state.people.splice(i, 1); save(); render();
+  state.people.splice(i, 1); commit();
 };
 
+// Dépenses
 $('addExp').onclick = () => {
   const title = $('expTitle').value.trim() || 'Dépense';
   const amount = round(parseFloat($('expAmount').value));
@@ -240,23 +349,68 @@ $('addExp').onclick = () => {
   if (!payer) return toast('Ajoutez des participants');
   if (!(amount > 0)) return toast('Montant invalide');
   if (!forWho.length) return toast('Choisissez au moins une personne');
-  state.expenses.push({ title, amount, payer, for: forWho, date: Date.now() });
-  $('expTitle').value = ''; $('expAmount').value = '';
-  save(); render(); toast('Dépense ajoutée');
+  if (editIndex !== null) {
+    Object.assign(state.expenses[editIndex], { title, amount, payer, for: forWho });
+    cancelEdit(); commit('Dépense modifiée');
+  } else {
+    state.expenses.push({ title, amount, payer, for: forWho, date: Date.now() });
+    $('expTitle').value = ''; $('expAmount').value = '';
+    commit('Dépense ajoutée');
+  }
 };
+
+window.editExpense = i => {
+  const e = state.expenses[i];
+  editIndex = i;
+  $('expTitle').value = e.title; $('expAmount').value = e.amount;
+  $('expPayer').innerHTML = options(e.payer);
+  $('expFor').innerHTML = state.people.map(p =>
+    `<label><input type="checkbox" value="${esc(p)}"${e.for.includes(p) ? ' checked' : ''}> ${esc(p)}</label>`).join('');
+  $('expFormTitle').textContent = 'Modifier la dépense';
+  $('addExp').textContent = 'Enregistrer';
+  $('cancelEdit').classList.remove('hidden');
+  $('expCard').classList.add('editing');
+  $('expCard').scrollIntoView({ behavior: 'smooth' });
+};
+function cancelEdit() {
+  editIndex = null;
+  $('expTitle').value = ''; $('expAmount').value = '';
+  $('expFormTitle').textContent = 'Ajouter une dépense';
+  $('addExp').textContent = 'Ajouter';
+  $('cancelEdit').classList.add('hidden');
+  $('expCard').classList.remove('editing');
+}
+$('cancelEdit').onclick = () => { cancelEdit(); render(); };
 
 window.removeExpense = i => {
-  if (confirm('Supprimer « ' + state.expenses[i].title + ' » ?')) { state.expenses.splice(i, 1); save(); render(); }
+  const e = state.expenses[i];
+  const label = e.type === 'remb' ? 'ce remboursement' : '« ' + e.title + ' »';
+  if (confirm('Supprimer ' + label + ' ?')) { state.expenses.splice(i, 1); if (editIndex !== null) cancelEdit(); commit(); }
 };
 
-$('groupName').oninput = e => { state.name = e.target.value; save(); };
+// Remboursements (enregistrés comme un paiement de « from » vers « to »)
+function addRemb(from, to, amount) {
+  state.expenses.push({ type: 'remb', title: 'Remboursement', amount: round(amount), payer: from, for: [to], date: Date.now() });
+}
+window.markPaid = i => {
+  const s = window._settle[i];
+  if (!confirm(`Confirmer que ${s.from} a remboursé ${euro(s.amount)} à ${s.to} ?`)) return;
+  addRemb(s.from, s.to, s.amount); commit('Remboursement enregistré');
+};
+$('addRemb').onclick = () => {
+  const from = $('rFrom').value, to = $('rTo').value, amount = parseFloat($('rAmount').value);
+  if (!from || !to) return toast('Ajoutez des participants');
+  if (from === to) return toast('Choisissez deux personnes différentes');
+  if (!(amount > 0)) return toast('Montant invalide');
+  addRemb(from, to, amount); $('rAmount').value = ''; commit('Remboursement enregistré');
+};
 
+// Partage
 $('share').onclick = async () => {
   save();
   try { await navigator.clipboard.writeText(location.href); toast('Lien copié !'); }
   catch (e) { prompt('Copiez ce lien :', location.href); }
 };
-
 $('export').onclick = () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -267,19 +421,29 @@ $('export').onclick = () => {
 $('importBtn').onclick = () => $('importFile').click();
 $('importFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
-  f.text().then(t => { try { state = JSON.parse(t); save(); render(); toast('Importé !'); } catch (_) { toast('Fichier invalide'); } });
+  f.text().then(t => {
+    try { addOrReplaceGroup(JSON.parse(t)); state = db.groups[db.current]; commit('Groupe importé !'); }
+    catch (_) { toast('Fichier invalide'); }
+  });
+  e.target.value = '';
 };
 
-$('reset').onclick = () => {
-  if (confirm('Effacer toutes les données de ce groupe ?')) { state = { name: '', people: [], expenses: [] }; save(); render(); }
-};
-
+// Onglets
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
   ['depenses', 'equilibre', 'groupe'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
 });
 
-window.addEventListener('hashchange', () => { load(); render(); });
+window.addEventListener('hashchange', () => {
+  const hash = location.hash.slice(1);
+  if (!hash.startsWith('d=')) return;
+  try {
+    const g = decode(hash.slice(2));
+    if (JSON.stringify(g) === JSON.stringify(state)) return;
+    addOrReplaceGroup(g); state = db.groups[db.current]; cancelEdit(); render();
+  } catch (e) {}
+});
+
 load();
 if (!state.people.length) document.querySelector('[data-tab="groupe"]').click();
 render();
