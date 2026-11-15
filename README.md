@@ -1,3 +1,5 @@
+https://k-ami-la.github.io/money_money/
+
 # Money_money – partage des frais entre amis
 Un petit clone de Tricount en un seul fichier HTML, sans serveur, hébergeable gratuitement sur GitHub Pages.
 
