@@ -23,3 +23,4 @@ Un petit clone de Tricount en un seul fichier HTML, sans serveur, hébergeable g
 4. Si un ami ajoute une dépense, il renvoie son nouveau lien au groupe : c'est lui qui contient la version à jour.
 
 > Limite : il n'y a pas de base de données partagée, donc deux personnes qui modifient en même temps auront deux versions différentes. Pour une vraie synchronisation en temps réel, on peut brancher une base gratuite comme Firebase ou Supabase.
+> 
