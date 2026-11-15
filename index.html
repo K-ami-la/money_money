@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniCount – Partage des frais</title>
+<style>
+  :root { --bg:#f5f3ee; --card:#fff; --ink:#1f2328; --muted:#6b7280; --accent:#0f766e; --accent2:#e6f2f0; --red:#b42318; --green:#067647; --line:#e5e2da; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:18px 16px; }
+  header h1 { margin:0; font-size:1.3rem; }
+  header input { background:transparent; border:none; color:#fff; font-size:1.3rem; font-weight:700; width:100%; outline:none; }
+  header small { opacity:.8; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:1rem; margin:0 0 12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  input, select { font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input:focus, select:focus { outline:2px solid var(--accent); border-color:transparent; }
+  button { font:inherit; padding:9px 14px; border:none; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:var(--accent2); color:var(--accent); }
+  button.danger { background:none; color:var(--red); padding:4px 8px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .chip { background:var(--accent2); color:var(--accent); border-radius:999px; padding:4px 6px 4px 12px; display:flex; align-items:center; gap:4px; }
+  .chip button { background:none; color:var(--accent); padding:0 6px; }
+  .checks { display:flex; flex-wrap:wrap; gap:10px; margin:10px 0; }
+  .checks label { display:flex; gap:4px; align-items:center; }
+  ul.list { list-style:none; padding:0; margin:0; }
+  ul.list li { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:8px; }
+  ul.list li:last-child { border-bottom:none; }
+  .muted { color:var(--muted); font-size:.85rem; }
+  .pos { color:var(--green); font-weight:600; }
+  .neg { color:var(--red); font-weight:600; }
+  .total { font-size:1.6rem; font-weight:700; }
+  .tabs { display:flex; gap:6px; margin-bottom:16px; }
+  .tabs button { flex:1; background:var(--card); color:var(--ink); border:1px solid var(--line); }
+  .tabs button.active { background:var(--accent); color:#fff; }
+  .hidden { display:none; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:8px; opacity:0; transition:.3s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<header>
+  <input id="groupName" placeholder="Nom du groupe (ex : Week-end à Lyon)">
+  <small>Partage des frais entre amis</small>
+</header>
+
+<main>
+  <div class="tabs">
+    <button data-tab="depenses" class="active">Dépenses</button>
+    <button data-tab="equilibre">Équilibre</button>
+    <button data-tab="groupe">Groupe</button>
+  </div>
+
+  <!-- DÉPENSES -->
+  <section id="tab-depenses">
+    <div class="card">
+      <h2>Ajouter une dépense</h2>
+      <div class="row">
+        <input id="expTitle" placeholder="Quoi ? (ex : Courses)" style="flex:2;min-width:160px">
+        <input id="expAmount" type="number" step="0.01" min="0" placeholder="Montant €" style="flex:1;min-width:110px">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="muted" style="align-self:center">Payé par</label>
+        <select id="expPayer" style="flex:1"></select>
+      </div>
+      <div class="muted" style="margin-top:10px">Pour qui (partage égal) :</div>
+      <div class="checks" id="expFor"></div>
+      <button id="addExp">Ajouter</button>
+    </div>
+    <div class="card">
+      <h2>Historique</h2>
+      <div class="muted">Total : <span class="total" id="total">0 €</span></div>
+      <ul class="list" id="expList"></ul>
+    </div>
+  </section>
+
+  <!-- ÉQUILIBRE -->
+  <section id="tab-equilibre" class="hidden">
+    <div class="card">
+      <h2>Soldes</h2>
+      <ul class="list" id="balances"></ul>
+    </div>
+    <div class="card">
+      <h2>Qui doit rembourser qui</h2>
+      <ul class="list" id="settle"></ul>
+    </div>
+  </section>
+
+  <!-- GROUPE -->
+  <section id="tab-groupe" class="hidden">
+    <div class="card">
+      <h2>Participants</h2>
+      <div class="row">
+        <input id="personName" placeholder="Prénom" style="flex:1">
+        <button id="addPerson">Ajouter</button>
+      </div>
+      <div class="chips" id="people"></div>
+    </div>
+    <div class="card">
+      <h2>Partager avec les amis</h2>
+      <p class="muted">Le lien contient toutes les données du groupe. Envoyez-le à vos amis ; s'ils ajoutent des dépenses, ils vous renvoient leur nouveau lien.</p>
+      <div class="row">
+        <button id="share">Copier le lien de partage</button>
+        <button class="ghost" id="export">Exporter (.json)</button>
+        <button class="ghost" id="importBtn">Importer</button>
+        <input type="file" id="importFile" accept=".json" class="hidden">
+      </div>
+    </div>
+    <div class="card">
+      <h2>Zone dangereuse</h2>
+      <button class="danger" id="reset">Tout effacer et créer un nouveau groupe</button>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'minicount-data';
+let state = { name: '', people: [], expenses: [] };
+
+// ---------- Sauvegarde / chargement ----------
+function encode(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+function decode(str) {
+  return JSON.parse(decodeURIComponent(escape(atob(str))));
+}
+function load() {
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('d=')) {
+    try { state = decode(hash.slice(2)); save(); return; } catch (e) { toast('Lien invalide'); }
+  }
+  try { const s = localStorage.getItem(KEY); if (s) state = JSON.parse(s); } catch (e) {}
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  history.replaceState(null, '', '#d=' + encode(state));
+}
+
+// ---------- Calculs ----------
+const euro = n => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+const round = n => Math.round(n * 100) / 100;
+
+function computeBalances() {
+  const bal = {};
+  state.people.forEach(p => bal[p] = 0);
+  state.expenses.forEach(e => {
+    if (!e.for.length) return;
+    bal[e.payer] = (bal[e.payer] || 0) + e.amount;
+    const share = e.amount / e.for.length;
+    e.for.forEach(p => bal[p] = (bal[p] || 0) - share);
+  });
+  return bal;
+}
+
+// Algorithme glouton : le plus gros débiteur rembourse le plus gros créancier
+function computeSettlements(bal) {
+  const debt = [], cred = [];
+  for (const [p, v] of Object.entries(bal)) {
+    const r = round(v);
+    if (r < -0.009) debt.push({ p, v: -r });
+    else if (r > 0.009) cred.push({ p, v: r });
+  }
+  debt.sort((a, b) => b.v - a.v); cred.sort((a, b) => b.v - a.v);
+  const out = []; let i = 0, j = 0;
+  while (i < debt.length && j < cred.length) {
+    const m = Math.min(debt[i].v, cred[j].v);
+    out.push({ from: debt[i].p, to: cred[j].p, amount: round(m) });
+    debt[i].v = round(debt[i].v - m); cred[j].v = round(cred[j].v - m);
+    if (debt[i].v < 0.01) i++;
+    if (cred[j].v < 0.01) j++;
+  }
+  return out;
+}
+
+// ---------- Affichage ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function render() {
+  $('groupName').value = state.name || '';
+
+  $('people').innerHTML = state.people.map((p, i) =>
+    `<span class="chip">${esc(p)}<button onclick="removePerson(${i})" title="Retirer">×</button></span>`).join('')
+    || '<span class="muted">Ajoutez d\'abord les participants.</span>';
+
+  $('expPayer').innerHTML = state.people.map(p => `<option>${esc(p)}</option>`).join('');
+  $('expFor').innerHTML = state.people.map(p =>
+    `<label><input type="checkbox" value="${esc(p)}" checked> ${esc(p)}</label>`).join('')
+    || '<span class="muted">Aucun participant – allez dans l\'onglet Groupe.</span>';
+
+  const total = state.expenses.reduce((s, e) => s + e.amount, 0);
+  $('total').textContent = euro(total);
+  $('expList').innerHTML = state.expenses.slice().reverse().map(e => {
+    const idx = state.expenses.indexOf(e);
+    return `<li><div><strong>${esc(e.title)}</strong><br>
+      <span class="muted">Payé par ${esc(e.payer)} · pour ${e.for.map(esc).join(', ')} · ${new Date(e.date).toLocaleDateString('fr-FR')}</span></div>
+      <div style="display:flex;align-items:center"><strong>${euro(e.amount)}</strong>
+      <button class="danger" onclick="removeExpense(${idx})" title="Supprimer">🗑</button></div></li>`;
+  }).join('') || '<li class="muted">Aucune dépense pour l\'instant.</li>';
+
+  const bal = computeBalances();
+  $('balances').innerHTML = Object.entries(bal).map(([p, v]) => {
+    const r = round(v);
+    return `<li><span>${esc(p)}</span><span class="${r > 0 ? 'pos' : r < 0 ? 'neg' : 'muted'}">${r > 0 ? '+' : ''}${euro(r)}</span></li>`;
+  }).join('') || '<li class="muted">Aucun participant.</li>';
+
+  const st = computeSettlements(bal);
+  $('settle').innerHTML = st.map(s =>
+    `<li><span><strong>${esc(s.from)}</strong> doit à <strong>${esc(s.to)}</strong></span><strong>${euro(s.amount)}</strong></li>`).join('')
+    || '<li class="muted">Tout le monde est quitte 🎉</li>';
+}
+
+// ---------- Actions ----------
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+
+$('addPerson').onclick = () => {
+  const n = $('personName').value.trim();
+  if (!n) return;
+  if (state.people.includes(n)) return toast('Ce prénom existe déjà');
+  state.people.push(n); $('personName').value = ''; save(); render();
+};
+$('personName').onkeydown = e => { if (e.key === 'Enter') $('addPerson').click(); };
+
+window.removePerson = i => {
+  const p = state.people[i];
+  if (state.expenses.some(e => e.payer === p || e.for.includes(p)))
+    return toast(p + ' est utilisé dans des dépenses');
+  state.people.splice(i, 1); save(); render();
+};
+
+$('addExp').onclick = () => {
+  const title = $('expTitle').value.trim() || 'Dépense';
+  const amount = round(parseFloat($('expAmount').value));
+  const payer = $('expPayer').value;
+  const forWho = [...$('expFor').querySelectorAll('input:checked')].map(c => c.value);
+  if (!payer) return toast('Ajoutez des participants');
+  if (!(amount > 0)) return toast('Montant invalide');
+  if (!forWho.length) return toast('Choisissez au moins une personne');
+  state.expenses.push({ title, amount, payer, for: forWho, date: Date.now() });
+  $('expTitle').value = ''; $('expAmount').value = '';
+  save(); render(); toast('Dépense ajoutée');
+};
+
+window.removeExpense = i => {
+  if (confirm('Supprimer « ' + state.expenses[i].title + ' » ?')) { state.expenses.splice(i, 1); save(); render(); }
+};
+
+$('groupName').oninput = e => { state.name = e.target.value; save(); };
+
+$('share').onclick = async () => {
+  save();
+  try { await navigator.clipboard.writeText(location.href); toast('Lien copié !'); }
+  catch (e) { prompt('Copiez ce lien :', location.href); }
+};
+
+$('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.name || 'groupe') + '.json';
+  a.click();
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { try { state = JSON.parse(t); save(); render(); toast('Importé !'); } catch (_) { toast('Fichier invalide'); } });
+};
+
+$('reset').onclick = () => {
+  if (confirm('Effacer toutes les données de ce groupe ?')) { state = { name: '', people: [], expenses: [] }; save(); render(); }
+};
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
+  ['depenses', 'equilibre', 'groupe'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+});
+
+window.addEventListener('hashchange', () => { load(); render(); });
+load();
+if (!state.people.length) document.querySelector('[data-tab="groupe"]').click();
+render();
+</script>
+</body>
+</html>
